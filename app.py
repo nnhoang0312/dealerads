@@ -211,23 +211,36 @@ def format_currency(value: float) -> str:
     return f"₫ {float(value):,.0f}"
 
 
-def render_metric_card(title: str, value: str, description: str, theme: str) -> None:
-    background = "#111827" if theme == "dark" else "#ffffff"
-    text = "#f9fafb" if theme == "dark" else "#111827"
-    border = "rgba(255,255,255,0.08)" if theme == "dark" else "rgba(15, 23, 42, 0.08)"
+def render_metric_card(title: str, value: str, description: str, theme: str, accent: str = "blue") -> None:
+    palette = {
+        "blue": ("#0f172a", "#3b82f6", "#93c5fd"),
+        "teal": ("#0f172a", "#14b8a6", "#99f6e4"),
+        "violet": ("#0f172a", "#8b5cf6", "#ddd6fe"),
+        "amber": ("#0f172a", "#f59e0b", "#fde68a"),
+        "rose": ("#0f172a", "#f43f5e", "#fecdd3"),
+    }
+    base, glow, accent_text = palette.get(accent, palette["blue"])
+    background = f"linear-gradient(135deg, {base}, {glow})"
+    text = "#f8fafc" if theme == "dark" else "#0f172a"
+    subtext = accent_text if theme == "dark" else "#334155"
+    border = "rgba(255,255,255,0.12)" if theme == "dark" else "rgba(59,130,246,0.18)"
+
     st.markdown(
         f"""
         <div style="
             border-radius: 24px;
             padding: 1.1rem 1.2rem;
-            background: linear-gradient(135deg, {background}, rgba(59,130,246,0.12));
+            background: {background};
             border: 1px solid {border};
-            box-shadow: 0 15px 35px rgba(15,23,42,0.12);
-            min-height: 125px;
+            box-shadow: 0 20px 40px rgba(15,23,42,0.22);
+            min-height: 130px;
+            position: relative;
+            overflow: hidden;
         ">
-            <div style="font-size: 0.9rem; color: #93c5fd; margin-bottom: 0.4rem;">{title}</div>
-            <div style="font-size: 1.8rem; font-weight: 700; color: {text}; margin-bottom: 0.35rem;">{value}</div>
-            <div style="font-size: 0.9rem; color: #94a3b8;">{description}</div>
+            <div style="position:absolute; inset:auto -20px -30px auto; width: 90px; height: 90px; border-radius: 999px; background: rgba(255,255,255,0.12);"></div>
+            <div style="font-size: 0.88rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: {accent_text}; margin-bottom: 0.55rem;">{title}</div>
+            <div style="font-size: 1.85rem; font-weight: 800; color: {text}; margin-bottom: 0.4rem; line-height: 1.1;">{value}</div>
+            <div style="font-size: 0.95rem; color: {subtext}; max-width: 18rem;">{description}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -254,24 +267,93 @@ def build_theme_template(theme: str):
     return "plotly_dark" if theme == "dark" else "plotly"
 
 
-def main():
-    theme = st.toggle("Dark mode", value=True, help="Switch between dark and light Plotly themes")
-    template = build_theme_template("dark" if theme else "light")
+def style_plotly_fig(fig, font_size=17, legend_font_size=16, grid_color="#e5e7eb", bg_color="#f8fafc", border_radius=18, marker_size=10, line_width=3, height=480):
+    fig.update_layout(
+        font=dict(family="Inter, Arial, sans-serif", size=font_size, color="#0f172a"),
+        legend=dict(
+            bgcolor="rgba(255,255,255,0.92)",
+            bordercolor="#c7d2fe",
+            borderwidth=1,
+            font=dict(size=legend_font_size, color="#334155"),
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        plot_bgcolor=bg_color,
+        paper_bgcolor=bg_color,
+        margin=dict(l=32, r=24, t=48, b=32),
+        xaxis=dict(showgrid=True, gridcolor=grid_color, zeroline=False, linecolor="#cbd5e1", linewidth=1, tickfont=dict(size=font_size+2)),
+        yaxis=dict(showgrid=True, gridcolor=grid_color, zeroline=False, linecolor="#cbd5e1", linewidth=1, tickfont=dict(size=font_size+2)),
+        height=height,
+    )
+    # Chỉ áp dụng marker size cho line/scatter chart, tránh lỗi với bar chart
+    for d in fig.data:
+        if getattr(d, "type", "") in {"scatter", "scattergl"} and hasattr(d, "marker"):
+            d.marker.size = marker_size
+        if getattr(d, "type", "") in {"scatter", "scattergl", "line"} and hasattr(d, "line"):
+            d.line.width = line_width
+    return fig
 
+
+def main():
+    theme = True
+    is_dark = theme
     st.markdown(
-        """
+        f"""
         <style>
-            .block-container { padding-top: 1.3rem; }
-            .stTabs [data-baseweb="tab-list"] { gap: 0.55rem; }
-            .stTabs [data-baseweb="tab"] { border-radius: 999px; padding: 0.45rem 1rem; }
-            h1, h2, h3 { letter-spacing: -0.02em; }
+            .block-container {{
+                padding-top: 1.1rem;
+                padding-bottom: 2.4rem;
+            }}
+            [data-testid="stSidebar"] {{
+                background: {'linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.92))' if theme else 'linear-gradient(180deg, #f8fbff, #eef2ff)'};
+                border-right: 1px solid rgba(99, 102, 241, 0.18);
+            }}
+            [data-testid="stAppViewContainer"] {{
+                background: {'radial-gradient(circle at top left, rgba(56,189,248,0.18), transparent 24%), radial-gradient(circle at top right, rgba(139,92,246,0.16), transparent 22%), linear-gradient(180deg, #020617 0%, #111827 45%, #0f172a 100%)' if theme else 'radial-gradient(circle at top left, rgba(191,219,254,0.95), transparent 24%), radial-gradient(circle at top right, rgba(224,231,255,0.95), transparent 22%), linear-gradient(180deg, #f8fbff 0%, #eef2ff 42%, #fdf2f8 100%)'};
+            }}
+            h1, h2, h3 {{
+                letter-spacing: -0.03em;
+            }}
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    st.title("📊 Facebook Ads Dealer Analytics Dashboard")
-    st.caption("Upload your Facebook Ads export to explore performance, dealer trends, product mix, and raw data.")
+    st.markdown(
+        f"""
+        <div style="
+            border-radius: 28px;
+            padding: 1.35rem 1.45rem;
+            margin-bottom: 1.15rem;
+            background: {'linear-gradient(135deg, rgba(14,116,144,0.28), rgba(59,130,246,0.22))' if is_dark else 'linear-gradient(135deg, rgba(224,242,254,0.98), rgba(233,213,255,0.96))'};
+            border: 1px solid {'rgba(125,211,252,0.18)' if is_dark else 'rgba(99,102,241,0.16)'};
+            box-shadow: 0 18px 40px rgba(15,23,42,0.12);
+        ">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap: 1rem; flex-wrap:wrap;">
+                <div>
+                    <div style="display:inline-flex; align-items:center; gap:0.45rem; padding:0.35rem 0.75rem; border-radius:999px; background: rgba(59,130,246,0.18); color:#93c5fd; font-size:0.84rem; font-weight:700; margin-bottom: 0.7rem;">
+                        ⚡ Live performance intelligence
+                    </div>
+                    <div style="font-size: 2rem; font-weight: 800; color: {'#f8fafc' if is_dark else '#0f172a'}; line-height:1.1; margin-bottom: 0.5rem;">
+                        Facebook Ads Dealer Analytics Dashboard
+                    </div>
+                    <div style="font-size: 1rem; color: {'#cbd5e1' if is_dark else '#334155'}; max-width: 56rem;">
+                        Theo dõi chi tiêu, hiệu quả tiếp cận, tin nhắn và phân tích dealer trong một không gian trực quan, rõ ràng và đầy màu sắc.
+                    </div>
+                </div>
+                <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+                    <span style="padding:0.45rem 0.8rem; border-radius:999px; background: rgba(45,212,191,0.16); color:#99f6e4; font-weight:700;">📈 KPI chính</span>
+                    <span style="padding:0.45rem 0.8rem; border-radius:999px; background: rgba(167,139,250,0.18); color:#ddd6fe; font-weight:700;">🎯 Dealer insight</span>
+                    <span style="padding:0.45rem 0.8rem; border-radius:999px; background: rgba(251,191,36,0.18); color:#fde68a; font-weight:700;">🧠 Message performance</span>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     uploaded = st.file_uploader(
         "Upload Excel or CSV file",
@@ -300,6 +382,10 @@ def main():
 
     with st.sidebar:
         st.header("Filters")
+        theme = st.toggle("Dark mode", value=theme, help="Switch between dark and light Plotly themes")
+        template = build_theme_template("dark" if theme else "light")
+        is_dark = theme
+
         start_date, end_date = st.date_input(
             "Select date range",
             value=(min_date, max_date),
@@ -317,6 +403,22 @@ def main():
         product = st.selectbox("Product", products)
         campaign = st.selectbox("Campaign", campaigns)
 
+        st.divider()
+        st.subheader("Navigation")
+        view = st.radio(
+            "Choose a view",
+            [
+                "Overview",
+                "Dealer Analysis",
+                "Product Analysis",
+                "Message Performance",
+                "Raw Data",
+            ],
+            horizontal=False,
+            label_visibility="collapsed",
+            help="Switch between dashboard sections",
+        )
+
     filtered = apply_filters(raw_df, start_date, end_date, dealer, objective, product, campaign)
 
     if filtered.empty:
@@ -333,21 +435,19 @@ def main():
     st.subheader("KPI Overview")
     cols = st.columns(6)
     with cols[0]:
-        render_metric_card("Total Spend", format_currency(total_spend), "All selected campaigns", "dark" if theme else "light")
+        render_metric_card("Total Spend", format_currency(total_spend), "All selected campaigns", "dark" if theme else "light", accent="blue")
     with cols[1]:
-        render_metric_card("Messages", f"{total_messages:,.0f}", "Message conversations started", "dark" if theme else "light")
+        render_metric_card("Messages", f"{total_messages:,.0f}", "Message conversations started", "dark" if theme else "light", accent="violet")
     with cols[2]:
-        render_metric_card("Cost per Message", format_currency(cost_per_message), "Spend divided by messages", "dark" if theme else "light")
+        render_metric_card("Cost per Message", format_currency(cost_per_message), "Spend divided by messages", "dark" if theme else "light", accent="amber")
     with cols[3]:
-        render_metric_card("Reach", f"{total_reach:,.0f}", "Unique audience reached", "dark" if theme else "light")
+        render_metric_card("Reach", f"{total_reach:,.0f}", "Unique audience reached", "dark" if theme else "light", accent="teal")
     with cols[4]:
-        render_metric_card("Impressions", f"{total_impressions:,.0f}", "Total ad impressions", "dark" if theme else "light")
+        render_metric_card("Impressions", f"{total_impressions:,.0f}", "Total ad impressions", "dark" if theme else "light", accent="blue")
     with cols[5]:
-        render_metric_card("Avg Frequency", f"{avg_frequency:.2f}x", "Average impressions per reach", "dark" if theme else "light")
+        render_metric_card("Avg Frequency", f"{avg_frequency:.2f}x", "Average impressions per reach", "dark" if theme else "light", accent="rose")
 
-    tabs = st.tabs(["Overview", "Dealer Analysis", "Product Analysis", "Message Performance", "Raw Data"])
-
-    with tabs[0]:
+    if view == "Overview":
         st.subheader("Campaign snapshot")
         overview_cols = st.columns(2)
 
@@ -360,7 +460,8 @@ def main():
                 markers=True,
                 title="Spend over time by dealer",
             )
-            fig.update_layout(template=template, height=380, legend_title_text="Dealer")
+            fig.update_layout(template=template, legend_title_text="Dealer")
+            fig = style_plotly_fig(fig, height=500)
             st.plotly_chart(fig, use_container_width=True)
 
         with overview_cols[1]:
@@ -372,10 +473,11 @@ def main():
                 orientation="h",
                 title="Spend by dealer and objective",
             )
-            fig.update_layout(template=template, height=380, legend_title_text="Objective")
+            fig.update_layout(template=template, legend_title_text="Objective", barmode="group", bargap=0.25)
+            fig = style_plotly_fig(fig, height=500)
             st.plotly_chart(fig, use_container_width=True)
 
-    with tabs[1]:
+    elif view == "Dealer Analysis":
         st.subheader("Dealer overview")
 
         dealer_cols = st.columns(2)
@@ -388,7 +490,8 @@ def main():
                 markers=True,
                 title="Spend by day and dealer",
             )
-            fig.update_layout(template=template, height=380, legend_title_text="Dealer")
+            fig.update_layout(template=template, legend_title_text="Dealer")
+            fig = style_plotly_fig(fig, height=500)
             st.plotly_chart(fig, use_container_width=True)
 
         with dealer_cols[1]:
@@ -400,7 +503,8 @@ def main():
                 markers=True,
                 title="Messages by day and dealer",
             )
-            fig.update_layout(template=template, height=380, legend_title_text="Dealer")
+            fig.update_layout(template=template, legend_title_text="Dealer")
+            fig = style_plotly_fig(fig, height=500)
             st.plotly_chart(fig, use_container_width=True)
 
         dealer_bar_cols = st.columns(2)
@@ -434,7 +538,7 @@ def main():
             fig.update_layout(template=template, height=380, xaxis_title="Spend", yaxis_title="Dealer", showlegend=False)
             st.plotly_chart(fig, use_container_width=True)
 
-    with tabs[2]:
+    elif view == "Product Analysis":
         st.subheader("Product analysis")
 
         product_cols = st.columns(2)
@@ -496,7 +600,7 @@ def main():
         fig.update_layout(template=template, height=420, xaxis_title="Product", yaxis_title="Dealer")
         st.plotly_chart(fig, use_container_width=True)
 
-    with tabs[3]:
+    elif view == "Message Performance":
         st.subheader("Message performance")
         perf_cols = st.columns(2)
 
@@ -541,7 +645,7 @@ def main():
         scatter.update_layout(template=template, height=380)
         st.plotly_chart(scatter, use_container_width=True)
 
-    with tabs[4]:
+    else:
         st.subheader("Performance table")
         search_term = st.text_input("Search table", placeholder="Search dealer, objective, product, campaign, or ad name")
         display_df = filtered.copy()
